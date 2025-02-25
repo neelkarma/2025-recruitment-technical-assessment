@@ -1,11 +1,34 @@
-use axum::{http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    http::{header::ValueDrain, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 pub async fn process_data(Json(request): Json<DataRequest>) -> impl IntoResponse {
-    // Calculate sums and return response
+    let mut string_len = 0;
+    let mut int_sum = 0;
+
+    for item in request.data {
+        match item {
+            Value::String(string) => string_len += string.len(),
+            Value::Number(num) => {
+                // i'm assuming that we only accept integers, due to the response variable name
+                if let Some(int) = num.as_i64() {
+                    int_sum += int;
+                } else {
+                    // not exactly sure how to return error messages without pissing off the compiler, sry
+                    return (StatusCode::BAD_REQUEST, Json(DataResponse::default()));
+                }
+            }
+            _ => return (StatusCode::BAD_REQUEST, Json(DataResponse::default())),
+        }
+    }
 
     let response = DataResponse {
-        
+        string_len,
+        int_sum,
     };
 
     (StatusCode::OK, Json(response))
@@ -13,10 +36,20 @@ pub async fn process_data(Json(request): Json<DataRequest>) -> impl IntoResponse
 
 #[derive(Deserialize)]
 pub struct DataRequest {
-    // Add any fields here
+    data: Vec<Value>,
 }
 
 #[derive(Serialize)]
 pub struct DataResponse {
-    // Add any fields here
+    string_len: usize,
+    int_sum: i64,
+}
+
+impl Default for DataResponse {
+    fn default() -> Self {
+        Self {
+            string_len: 0,
+            int_sum: 0,
+        }
+    }
 }
